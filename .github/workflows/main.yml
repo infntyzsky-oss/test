@@ -1,0 +1,21 @@
+name: Build AML
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Android NDK
+      uses: nttld/setup-ndk@v1
+      with:
+        ndk-version: r25c
+
+    - name: Build
+      run: |
+        ndk-build NDK_PROJECT_PATH=. APP_BUILD_SCRIPT=jni/Android.mk

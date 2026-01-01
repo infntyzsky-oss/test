@@ -2,32 +2,21 @@ name: Build AML
 
 on:
   push:
-  workflow_dispatch:
+    branches: [ "main" ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
 
     steps:
     - uses: actions/checkout@v4
 
-    - name: Setup NDK
+    - name: Install NDK
       uses: nttld/setup-ndk@v1
       with:
-        ndk-version: r21e
+        ndk-version: r25c
 
     - name: Build
       run: |
-        ndk-build \
-          NDK_PROJECT_PATH=. \
-          APP_BUILD_SCRIPT=Android.mk \
-          APP_ABI=armeabi-v7a \
-          APP_PLATFORM=android-21
-
-    - name: Upload SO
-      uses: actions/upload-artifact@v4
-      with:
-        name: reshade
-        path: libs/**/libreshade.so
+        ndk-build
+        ls -R

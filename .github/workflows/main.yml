@@ -1,0 +1,33 @@
+name: Build AML ReShade
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v4
+
+    - name: Install Android NDK
+      uses: nttld/setup-ndk@v1
+      with:
+        ndk-version: r21e
+
+    - name: Build reshade.so
+      run: |
+        $ANDROID_NDK_HOME/ndk-build \
+          NDK_PROJECT_PATH=. \
+          APP_BUILD_SCRIPT=Android.mk \
+          APP_ABI=armeabi-v7a \
+          APP_PLATFORM=android-21
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: reshade-so
+        path: libs/armeabi-v7a/*.so

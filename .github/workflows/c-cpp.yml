@@ -1,0 +1,54 @@
+name: Build AO Shader Library
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Setup Android NDK
+      uses: nttld/setup-ndk@v1
+      with:
+        ndk-version: r21e
+        add-to-path: true
+    
+    - name: Build native library
+      run: |
+        cd jni
+        ndk-build NDK_PROJECT_PATH=. APP_BUILD_SCRIPT=Android.mk
+    
+    - name: List output files
+      run: |
+        echo "Build completed! Output files:"
+        find libs -name "*.so"
+    
+    - name: Upload ARM library
+      uses: actions/upload-artifact@v3
+      with:
+        name: libao_inject-armeabi-v7a
+        path: libs/armeabi-v7a/libao_inject.so
+        if-no-files-found: error
+    
+    - name: Create release package
+      run: |
+        mkdir -p release
+        cp libs/armeabi-v7a/libao_inject.so release/
+        cp lua/ao_control.lua release/
+        cp README.md release/
+        cd release
+        zip -r ../ao_shader_package.zip *
+    
+    - name: Upload release package
+      uses: actions/upload-artifact@v3
+      with:
+        name: ao_shader_complete_package
+        path: ao_shader_package.zip

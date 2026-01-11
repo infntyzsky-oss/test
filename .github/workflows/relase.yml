@@ -11,59 +11,71 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-    
+
     - name: Setup Android NDK
       uses: nttld/setup-ndk@v1
       with:
         ndk-version: r21e
         add-to-path: true
-    
+
     - name: Build native library
       run: |
+        set -e
         cd jni
         ndk-build NDK_PROJECT_PATH=. APP_BUILD_SCRIPT=Android.mk
-    
+
+    - name: Verify build output
+      run: |
+        if [ ! -f "jni/libs/armeabi-v7a/libao_inject.so" ]; then
+          echo "ERROR: libao_inject.so not found"
+          exit 1
+        fi
+
     - name: Create release package
       run: |
+        set -e
         mkdir -p release
-        cp libs/armeabi-v7a/libao_inject.so release/
+        cp jni/libs/armeabi-v7a/libao_inject.so release/
         cp lua/ao_control.lua release/
         cp README.md release/
-        echo "## Installation" > release/INSTALL.txt
-        echo "1. Copy libao_inject.so to /data/data/com.rockstargames.gtasa/lib/" >> release/INSTALL.txt
-        echo "2. Copy ao_control.lua to your scripts folder" >> release/INSTALL.txt
-        echo "3. Restart GTA:SA" >> release/INSTALL.txt
+
+        cat <<EOF > release/INSTALL.txt
+        Installation:
+        1. Copy libao_inject.so to /data/data/com.rockstargames.gtasa/lib/
+        2. Copy ao_control.lua to your scripts folder
+        3. Restart GTA:SA
+        EOF
+
         cd release
         zip -r ../gtasa-ao-shader-${{ github.ref_name }}.zip *
-    
+
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v1
       with:
         files: gtasa-ao-shader-${{ github.ref_name }}.zip
         body: |
           ## GTA:SA Mobile - AO Shader Mod ${{ github.ref_name }}
-          
-          ### What's New
+
+          ### Features
           - Depth-based ambient occlusion
-          - Adjustable intensity (0-10)
+          - Adjustable intensity (0–10)
           - Runtime toggle
-          
+
           ### Installation
-          1. Download `gtasa-ao-shader-${{ github.ref_name }}.zip`
-          2. Extract `libao_inject.so` to `/data/data/com.rockstargames.gtasa/lib/`
-          3. Copy `ao_control.lua` to your mod loader
-          4. Restart game
-          
-          ### Usage
-          - `/ao` - Toggle
-          - `/ao [0-10]` - Set intensity
-          - `/aostats` - Show stats
-          
-          **Tested on**: GTA:SA Mobile v2.10 (ARMv7)
+          1. Extract `libao_inject.so` → `/data/data/com.rockstargames.gtasa/lib/`
+          2. Copy `ao_control.lua` to your mod loader
+          3. Restart game
+
+          ### Commands
+          - `/ao`
+          - `/ao [0-10]`
+          - `/aostats`
+
+          **Target**: ARMv7 (armeabi-v7a)
         draft: false
         prerelease: false
       env:

@@ -10,44 +10,50 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-    
+
     - name: Setup Android NDK
       uses: nttld/setup-ndk@v1
       with:
         ndk-version: r21e
         add-to-path: true
-    
+
     - name: Build native library
       run: |
+        set -e
         cd jni
         ndk-build NDK_PROJECT_PATH=. APP_BUILD_SCRIPT=Android.mk
-    
-    - name: List output files
+
+    - name: Verify build output
       run: |
         echo "Build completed! Output files:"
-        find libs -name "*.so"
-    
-    - name: Upload ARM library
+        if [ ! -d "jni/libs" ]; then
+          echo "ERROR: jni/libs not found (build failed)"
+          exit 1
+        fi
+        find jni/libs -name "*.so"
+
+    - name: Upload ARMv7 library
       uses: actions/upload-artifact@v4
       with:
         name: libao_inject-armeabi-v7a
-        path: libs/armeabi-v7a/libao_inject.so
+        path: jni/libs/armeabi-v7a/libao_inject.so
         if-no-files-found: error
-    
+
     - name: Create release package
       run: |
+        set -e
         mkdir -p release
-        cp libs/armeabi-v7a/libao_inject.so release/
+        cp jni/libs/armeabi-v7a/libao_inject.so release/
         cp lua/ao_control.lua release/
         cp README.md release/
         cd release
         zip -r ../ao_shader_package.zip *
-    
-    - name: Upload release package
+
+    - name: Upload full package
       uses: actions/upload-artifact@v4
       with:
         name: ao_shader_complete_package

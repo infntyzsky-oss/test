@@ -5,9 +5,11 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>   // <-- FIX strtoul
+#include <unistd.h>
 
-#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "AO_INJECT", __VA_ARGS__)
-#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR,"AO_INJECT", __VA_ARGS__)
+#define LOGI(...) __android_log_print(ANDROID_LOG_INFO,  "AO_INJECT", __VA_ARGS__)
+#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "AO_INJECT", __VA_ARGS__)
 
 #define SHADER_MAX 32768
 
@@ -23,7 +25,7 @@
 // ===============================
 static int gAOEnabled = 1;
 
-static int (*orig_BuildSource)(int,char**,char**) = nullptr;
+static int  (*orig_BuildSource)(int,char**,char**) = nullptr;
 static void (*orig_SelectShader)(void**) = nullptr;
 static void (*orig_InitShader)(void*) = nullptr;
 
@@ -34,12 +36,13 @@ static uintptr_t getLibBase(const char* name)
 {
     FILE* f = fopen("/proc/self/maps","r");
     if(!f) return 0;
+
     char line[512];
     while(fgets(line,sizeof(line),f))
     {
         if(strstr(line,name))
         {
-            uintptr_t base = strtoul(line,nullptr,16);
+            uintptr_t base = strtoul(line, nullptr, 16);
             fclose(f);
             return base;
         }
@@ -51,10 +54,11 @@ static uintptr_t getLibBase(const char* name)
 static void hookPtr(void** target, void* hook, void** orig)
 {
     uintptr_t page = (uintptr_t)target & ~0xFFF;
-    mprotect((void*)page, 4096, PROT_READ|PROT_WRITE);
+
+    mprotect((void*)page, 4096, PROT_READ | PROT_WRITE | PROT_EXEC);
     *orig = *target;
     *target = hook;
-    mprotect((void*)page, 4096, PROT_READ);
+    mprotect((void*)page, 4096, PROT_READ | PROT_EXEC);
 }
 
 // ===============================
@@ -63,14 +67,20 @@ static void hookPtr(void** target, void* hook, void** orig)
 static void injectAO(char* frag)
 {
     if(!gAOEnabled) return;
+    if(!frag) return;
     if(strstr(frag,"AO_INTENSITY")) return;
 
     const char* ao =
         "\n// === AO INJECT ===\n"
         "uniform float AO_INTENSITY;\n"
-        "float ao_calc(vec3 n){return clamp(dot(n,vec3(0,0,1)),0.0,1.0);}\n";
+        "float ao_calc(vec3 n){ return clamp(dot(n,vec3(0.0,0.0,1.0)),0.0,1.0); }\n";
 
-    strncat(frag, ao, SHADER_MAX);
+    size_t cur = strlen(frag);
+    size_t add = strlen(ao);
+
+    if(cur + add + 1 >= SHADER_MAX) return;
+
+    memcpy(frag + cur, ao, add + 1);
 }
 
 // ===============================
@@ -86,7 +96,6 @@ static int hk_BuildSource(int flags, char** pxl, char** vtx)
 static void hk_SelectShader(void** pp)
 {
     orig_SelectShader(pp);
-    // uniform upload handled by shader itself (cheap AO)
 }
 
 static void hk_InitShader(void* self)
@@ -132,5 +141,8 @@ static void init()
 // Lua API
 // ===============================
 extern "C" {
-    void ao_enable(int v){ gAOEnabled = v; }
+    void ao_enable(int v)
+    {
+        gAOEnabled = (v != 0);
+    }
 }
